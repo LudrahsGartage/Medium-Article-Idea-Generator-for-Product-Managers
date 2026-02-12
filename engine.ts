@@ -1,9 +1,17 @@
 
 import { PM_FRAMEWORKS, DIGITAL_PRODUCTS, PUBLIC_COMPANIES, PHYSICAL_DOMAINS } from './constants';
-import { IdeaResult, CategoryData } from './types';
+import { IdeaResult, CategoryType } from './types';
 
-export function generateSmartIdea(): IdeaResult {
-  const category = PM_FRAMEWORKS[Math.floor(Math.random() * PM_FRAMEWORKS.length)];
+export function generateSmartIdea(enabledCategories?: CategoryType[]): IdeaResult {
+  // Filter the pool based on enabled categories
+  const pool = enabledCategories && enabledCategories.length > 0
+    ? PM_FRAMEWORKS.filter(f => enabledCategories.includes(f.type))
+    : PM_FRAMEWORKS;
+
+  // Fallback to all if somehow pool is empty
+  const finalPool = pool.length > 0 ? pool : PM_FRAMEWORKS;
+  
+  const category = finalPool[Math.floor(Math.random() * finalPool.length)];
   const components: Record<string, string> = {};
   
   // 1. Initial selection
@@ -19,9 +27,6 @@ export function generateSmartIdea(): IdeaResult {
       components.product = DIGITAL_PRODUCTS[Math.floor(Math.random() * DIGITAL_PRODUCTS.length)];
       rulesApplied.push('Digital Product Alignment');
     }
-    if (components.topic === 'RICE prioritisation') {
-      // Logic for C1 specifically handles outcome later in formula
-    }
   }
 
   if (category.id === 'C3') {
@@ -32,7 +37,6 @@ export function generateSmartIdea(): IdeaResult {
   }
 
   if (category.id === 'C4') {
-    // Prevent tech-heavy methods on physical domains unless it's a "How I'd Fix" case
     if (PHYSICAL_DOMAINS.includes(components.domain) && ['A/B testing', 'SQL query'].includes(components.method)) {
       components.method = 'Journey map';
       rulesApplied.push('Domain/Method Compatibility');
@@ -44,7 +48,7 @@ export function generateSmartIdea(): IdeaResult {
   let subtitle = "";
 
   // 4. Validation Gates (Heuristic Score)
-  let score = 3; // Baseline
+  let score = 3; 
   if (title.length > 20) score++;
   if (Object.keys(components).length >= 3) score++;
 

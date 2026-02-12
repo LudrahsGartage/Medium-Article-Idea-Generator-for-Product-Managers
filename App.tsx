@@ -1,22 +1,98 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { generateSmartIdea } from './engine';
-import { IdeaResult } from './types';
+import { IdeaResult, CategoryType } from './types';
 import { VALUE_DEFINITIONS } from './definitions';
 
-const IOSButton: React.FC<{ onClick: () => void; children: React.ReactNode; primary?: boolean }> = ({ onClick, children, primary = false }) => (
+const IOSButton: React.FC<{ 
+  onClick: () => void; 
+  children: React.ReactNode; 
+  primary?: boolean;
+  className?: string;
+}> = ({ onClick, children, primary = false, className = "" }) => (
   <button
     onClick={onClick}
     className={`
-      px-4 py-3 sm:px-6 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg transition-all active:scale-95
+      px-4 py-3 sm:px-6 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg transition-all active:scale-95 w-full
       ${primary 
         ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0062CC]' 
         : 'bg-white text-[#007AFF] border border-gray-100 shadow-sm hover:bg-gray-50'}
+      ${className}
     `}
   >
     {children}
   </button>
 );
+
+const CategoryFilter: React.FC<{
+  currentCategory?: string;
+  enabledCategories: CategoryType[];
+  onToggle: (cat: CategoryType) => void;
+}> = ({ currentCategory, enabledCategories, onToggle }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const allCategories = Object.values(CategoryType);
+
+  return (
+    <div className="relative inline-block" ref={dropdownRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors group"
+      >
+        <span className="text-[#8E8E93] text-[10px] sm:text-xs font-bold uppercase tracking-widest">
+          {currentCategory || 'Select Categories'}
+        </span>
+        <svg 
+          className={`w-3 h-3 text-[#8E8E93] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-4 py-2 border-b border-gray-50 mb-1">
+            <span className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest">Filter Prompts</span>
+          </div>
+          {allCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => onToggle(cat)}
+              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+            >
+              <span className={`text-sm font-medium ${enabledCategories.includes(cat) ? 'text-gray-900' : 'text-gray-400'}`}>
+                {cat}
+              </span>
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                enabledCategories.includes(cat) 
+                  ? 'bg-[#007AFF] border-[#007AFF]' 
+                  : 'border-gray-200'
+              }`}>
+                {enabledCategories.includes(cat) && (
+                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ContextSheet: React.FC<{ 
   isOpen: boolean; 
@@ -27,10 +103,11 @@ const ContextSheet: React.FC<{
 
   const matchedDefinitions = Object.entries(components)
     .map(([key, value]) => {
-      const definition = VALUE_DEFINITIONS[value] || VALUE_DEFINITIONS[value.split(' ')[0]];
+      const val = value as string;
+      const definition = VALUE_DEFINITIONS[val] || VALUE_DEFINITIONS[val.split(' ')[0]];
       return {
         label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
-        value: value,
+        value: val,
         definition: definition
       };
     })
@@ -67,7 +144,11 @@ const ContextSheet: React.FC<{
   );
 };
 
-const DisclaimerSheet: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+const DisclaimerSheet: React.FC<{ 
+  isOpen: boolean; 
+  onClose: () => void;
+  onHowItWorks: () => void;
+}> = ({ isOpen, onClose, onHowItWorks }) => {
   if (!isOpen) return null;
 
   return (
@@ -154,6 +235,11 @@ const DisclaimerSheet: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ i
             </p>
             <p className="text-xl font-bold text-gray-900 text-center">Now go write something great. 🚀</p>
           </div>
+
+          <div className="flex flex-col gap-3 pt-6 pb-8">
+            <IOSButton primary onClick={onClose}>Start</IOSButton>
+            <IOSButton onClick={onHowItWorks}>How it works</IOSButton>
+          </div>
         </div>
       </div>
     </div>
@@ -198,7 +284,7 @@ const HowItWorksSheet: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ i
     { var: 'Situation', cat: 'C7', def: 'A common career scenario or challenge faced by aspiring or early‑career PMs.', ex: '"Mock interview", "Job description analysis", "First 90 days", "Networking", "Portfolio building"' },
     { var: 'Focus', cat: 'C7', def: 'A specific aspect or skill within the broader situation that the article examines.', ex: '"Estimation questions", "Required PM skills", "Onboarding strategy", "Finding a sponsor", "Fake PRD"' },
     { var: 'Format (Narrative)', cat: 'C7', def: 'The structural style in which the career experience is presented.', ex: '"Post‑mortem", "Spreadsheet audit", "Personal retrospective", "Conversation summary"' },
-    { var: 'Takeaway', cat: 'C7', def: 'The key lesson, mistake, or insight that gives the article value to readers.', ex: '"3 mistakes", "What ‘influence’ really means", "1 unexpected ask", "How I said ‘no’"' },
+    { var: 'Takeaway', cat: 'C7', def: 'The key lesson, mistake, or insight that gives the article value to readers.', ex: '"3 mistakes", "What ‘influence’ really means", "What I wish I’d known", "1 unexpected ask", "How I said ‘no’"' },
   ];
 
   return (
@@ -327,7 +413,9 @@ const IdeaCard: React.FC<{
   onSave: (idea: IdeaResult) => void;
   onContext: () => void;
   isSaved: boolean;
-}> = ({ idea, onGenerate, onSave, onContext, isSaved }) => {
+  enabledCategories: CategoryType[];
+  onToggleCategory: (cat: CategoryType) => void;
+}> = ({ idea, onGenerate, onSave, onContext, isSaved, enabledCategories, onToggleCategory }) => {
   if (!idea) {
     return (
       <div className="flex flex-col items-center justify-center space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 w-full max-w-lg mx-auto py-8">
@@ -343,11 +431,17 @@ const IdeaCard: React.FC<{
           </p>
         </div>
         <div className="bg-white/80 backdrop-blur-xl p-8 sm:p-10 rounded-[32px] sm:rounded-[40px] shadow-2xl shadow-gray-200/50 border border-white/50 w-full text-center">
+          <div className="mb-4">
+            <CategoryFilter 
+              enabledCategories={enabledCategories} 
+              onToggle={onToggleCategory}
+            />
+          </div>
           <p className="text-lg sm:text-xl font-medium text-gray-400 italic">
             "Your next viral PM post is just a click away."
           </p>
-          <div className="mt-8">
-            <IOSButton primary onClick={onGenerate}>
+          <div className="mt-8 flex justify-center">
+            <IOSButton primary onClick={onGenerate} className="sm:w-auto">
               Generate Idea
             </IOSButton>
           </div>
@@ -359,17 +453,14 @@ const IdeaCard: React.FC<{
   return (
     <div className="w-full max-w-3xl mx-auto px-4 animate-in fade-in zoom-in-95 duration-500 py-8">
       <div className="bg-white rounded-[32px] sm:rounded-[40px] p-6 sm:p-12 shadow-2xl shadow-gray-200/60 border border-gray-50 flex flex-col space-y-6 sm:space-y-8 relative overflow-hidden">
-        <div className="absolute top-0 right-8 sm:right-12 flex space-x-1 pt-4 sm:pt-6">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < idea.validationScore ? 'bg-green-400' : 'bg-gray-200'}`} />
-          ))}
-        </div>
-
+        
         <div className="flex flex-col space-y-2">
           <div className="flex justify-between items-start">
-            <span className="text-[#8E8E93] text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-              {idea.category}
-            </span>
+            <CategoryFilter 
+              currentCategory={idea.category}
+              enabledCategories={enabledCategories} 
+              onToggle={onToggleCategory}
+            />
             <button 
               onClick={() => onSave(idea)}
               className={`flex items-center space-x-1.5 text-xs sm:text-sm font-semibold transition-colors ${isSaved ? 'text-orange-500' : 'text-[#007AFF] hover:text-[#0062CC]'}`}
@@ -396,35 +487,36 @@ const IdeaCard: React.FC<{
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-50">
-          <div className="flex gap-2 w-full sm:w-auto">
-            <div className="flex-1 sm:flex-initial">
-              <IOSButton primary onClick={onGenerate}>
-                Generate New
-              </IOSButton>
-            </div>
+        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-50 w-full">
+          <div className="flex-1">
+            <IOSButton primary onClick={onGenerate}>
+              Generate New
+            </IOSButton>
+          </div>
+          <div className="flex-1">
             <button 
               onClick={() => {
                 const text = `${idea.title}\n${idea.subtitle || ''}`;
                 window.navigator.clipboard.writeText(text);
                 alert('Copied to clipboard!');
               }}
-              className="flex-1 sm:flex-initial px-4 py-3 sm:px-6 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg bg-white text-[#007AFF] border border-gray-100 shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
+              className="px-4 py-3 sm:px-6 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg bg-white text-[#007AFF] border border-gray-100 shadow-sm hover:bg-gray-50 active:scale-95 transition-all w-full"
             >
               Copy Text
             </button>
           </div>
-          
-          <button 
-            onClick={onContext}
-            className="w-full sm:w-auto px-4 py-3 sm:px-6 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg bg-white text-[#007AFF] border border-gray-100 shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center"
-            title="Need context?"
-          >
-            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="ml-2">Context</span>
-          </button>
+          <div className="flex-1">
+            <button 
+              onClick={onContext}
+              className="px-4 py-3 sm:px-6 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg bg-white text-[#007AFF] border border-gray-100 shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center w-full"
+              title="Need context?"
+            >
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="ml-2">Context</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -434,6 +526,7 @@ const IdeaCard: React.FC<{
 export default function App() {
   const [currentIdea, setCurrentIdea] = useState<IdeaResult | null>(null);
   const [savedIdeas, setSavedIdeas] = useState<IdeaResult[]>([]);
+  const [enabledCategories, setEnabledCategories] = useState<CategoryType[]>(Object.values(CategoryType));
   const [isSavedSheetOpen, setIsSavedSheetOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
@@ -448,6 +541,12 @@ export default function App() {
         console.error("Failed to parse saved ideas", e);
       }
     }
+
+    const hasVisited = localStorage.getItem('pm_muse_visited');
+    if (!hasVisited) {
+      setIsDisclaimerOpen(true);
+      localStorage.setItem('pm_muse_visited', 'true');
+    }
   }, []);
 
   useEffect(() => {
@@ -455,8 +554,8 @@ export default function App() {
   }, [savedIdeas]);
 
   const generateIdea = useCallback(() => {
-    setCurrentIdea(generateSmartIdea());
-  }, []);
+    setCurrentIdea(generateSmartIdea(enabledCategories));
+  }, [enabledCategories]);
 
   const toggleSave = useCallback((idea: IdeaResult) => {
     setSavedIdeas(prev => {
@@ -465,6 +564,21 @@ export default function App() {
         return prev.filter(i => i.title !== idea.title);
       }
       return [idea, ...prev];
+    });
+  }, []);
+
+  const toggleCategory = useCallback((cat: CategoryType) => {
+    setEnabledCategories(prev => {
+      const isCurrentlyEnabled = prev.includes(cat);
+      if (isCurrentlyEnabled) {
+        if (prev.length <= 1) {
+          alert("You must keep at least one category checked!");
+          return prev;
+        }
+        return prev.filter(c => c !== cat);
+      } else {
+        return [...prev, cat];
+      }
     });
   }, []);
 
@@ -507,7 +621,6 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center w-full px-4 overflow-y-visible">
-        {/* Dynamic scaling div that provides vertical room but stays centered */}
         <div className="w-full h-full flex items-center justify-center transform origin-center transition-transform scale-[0.85] sm:scale-100 portrait:scale-[0.95] landscape:scale-[0.8] sm:landscape:scale-100">
           <IdeaCard 
             idea={currentIdea} 
@@ -515,6 +628,8 @@ export default function App() {
             onSave={toggleSave}
             onContext={() => setIsContextOpen(true)}
             isSaved={isCurrentSaved}
+            enabledCategories={enabledCategories}
+            onToggleCategory={toggleCategory}
           />
         </div>
       </main>
@@ -564,6 +679,10 @@ export default function App() {
       <DisclaimerSheet 
         isOpen={isDisclaimerOpen} 
         onClose={() => setIsDisclaimerOpen(false)} 
+        onHowItWorks={() => {
+          setIsDisclaimerOpen(false);
+          setIsHowItWorksOpen(true);
+        }}
       />
 
       {currentIdea && (
